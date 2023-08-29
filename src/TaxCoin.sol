@@ -13,7 +13,7 @@ contract TaxCoin is ERC20, Ownable {
     bool public claimEnabled;
     bool public tradingEnabled;
 
-    LinqDividendTracker public dividendTracker;
+    TaxCoinDividendTracker public dividendTracker;
 
     address public devWallet;
 
@@ -60,8 +60,8 @@ contract TaxCoin is ERC20, Ownable {
         address indexed processor
     );
 
-    constructor(address _developerwallet) ERC20("Linq", "LINQ") {
-        dividendTracker = new LinqDividendTracker();
+    constructor(address _developerwallet) ERC20("TaxCoin", "TaxCoin") {
+        dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
 
         IUniswapRouter _router = IUniswapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
@@ -99,7 +99,7 @@ contract TaxCoin is ERC20, Ownable {
     receive() external payable {}
 
     function updateDividendTracker(address newAddress) public onlyOwner {
-        LinqDividendTracker newDividendTracker = LinqDividendTracker(
+        TaxCoinDividendTracker newDividendTracker = TaxCoinDividendTracker(
             payable(newAddress)
         );
         newDividendTracker.excludeFromDividends(
@@ -470,7 +470,7 @@ contract TaxCoin is ERC20, Ownable {
     }
 }
 
-contract LinqDividendTracker is Ownable, DividendPayingToken {
+contract TaxCoinDividendTracker is Ownable, DividendPayingToken {
     struct AccountInfo {
         address account;
         uint256 withdrawableDividends;
@@ -486,7 +486,7 @@ contract LinqDividendTracker is Ownable, DividendPayingToken {
     event Claim(address indexed account, uint256 amount);
 
     constructor()
-        DividendPayingToken("Linq_Dividend_Tracker", "Linq_Dividend_Tracker")
+        DividendPayingToken("TaxCoin_Dividend_Tracker", "TaxCoin_Dividend_Tracker")
     {}
 
     function trackerRescueETH20Tokens(address recipient, address tokenAddress)
@@ -508,7 +508,7 @@ contract LinqDividendTracker is Ownable, DividendPayingToken {
         address,
         uint256
     ) internal pure override {
-        require(false, "Linq_Dividend_Tracker: No transfers allowed");
+        require(false, "TaxCoin_Dividend_Tracker: No transfers allowed");
     }
 
     function excludeFromDividends(address account, bool value)
