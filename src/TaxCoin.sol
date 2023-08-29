@@ -2,10 +2,11 @@
 
 pragma solidity =0.8.15;
 
-import "./LPDiv.sol";
+import {DividendPayingToken, ERC20, Ownable} from "./utils/LPDiv.sol";
+import "./utils/IVeloV2.sol";
 
 contract TaxCoin is ERC20, Ownable {
-    IUniswapRouter public router;
+    IVeloV2 public router;
     address public pair;
 
     bool private swapping;
@@ -16,6 +17,7 @@ contract TaxCoin is ERC20, Ownable {
     TaxCoinDividendTracker public dividendTracker;
 
     address public devWallet;
+    address public tokenOut;
 
     uint256 public swapTokensAtAmount;
     uint256 public maxBuyAmount;
@@ -27,11 +29,11 @@ contract TaxCoin is ERC20, Ownable {
         uint256 dev;
     }
 
-    Taxes public buyTaxes = Taxes(2, 2);
-    Taxes public sellTaxes = Taxes(2, 2);
+    Taxes public buyTaxes = Taxes(3, 3);
+    Taxes public sellTaxes = Taxes(3, 3);
 
-    uint256 public totalBuyTax = 4;
-    uint256 public totalSellTax = 4;
+    uint256 public totalBuyTax = 6;
+    uint256 public totalSellTax = 6;
 
     mapping(address => bool) public _isBot;
 
@@ -60,14 +62,16 @@ contract TaxCoin is ERC20, Ownable {
         address indexed processor
     );
 
-    constructor(address _developerwallet) ERC20("TaxCoin", "TaxCoin") {
+    constructor(address _developerwallet, address _tokenOut) ERC20("TaxCoin", "TaxCoin") {
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
+        tokenOut = _tokenOut;
 
-        IUniswapRouter _router = IUniswapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        address _pair = IFactory(_router.factory()).createPair(
+        IVeloV2 _router = IVeloV2(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        address _pair = IPoolFactory(_router.defaultFactory()).createPool(
             address(this),
-            _router.WETH()
+            address(_tokenOut),
+            false
         );
 
         router = _router;
@@ -166,7 +170,7 @@ contract TaxCoin is ERC20, Ownable {
     }
 
     function updateRouter(address newRouter) external onlyOwner {
-        router = IUniswapRouter(newRouter);
+        router = IVeloV2(newRouter);
     }
 
     /////////////////////////////////
@@ -438,9 +442,13 @@ contract TaxCoin is ERC20, Ownable {
     }
 
     function swapTokensForETH(uint256 tokenAmount) private {
-        address[] memory path = new address[](2);
-        path[0] = address(this);
-        path[1] = router.WETH();
+        IVeloV2.Route[] memory route = new IVeloV2.Route[](1);
+        route[0] = IVeloV2.Route(
+            address(this),
+            address(router.weth()),
+            false,
+            address(router.defaultFactory())
+        );
 
         _approve(address(this), address(router), tokenAmount);
 
@@ -448,7 +456,7 @@ contract TaxCoin is ERC20, Ownable {
         router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
             0, // accept any amount of ETH
-            path,
+            route,
             address(this),
             block.timestamp
         );
@@ -459,9 +467,12 @@ contract TaxCoin is ERC20, Ownable {
         _approve(address(this), address(router), tokenAmount);
 
         // add the liquidity
-        router.addLiquidityETH{value: ethAmount}(
+        router.addLiquidity(
             address(this),
+            tokenOut,
+            false,
             tokenAmount,
+            ethAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
             address(this),

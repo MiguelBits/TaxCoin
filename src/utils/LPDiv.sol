@@ -8,51 +8,6 @@ import "./SafeMath.sol";
 import "./ILPDiv.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-
-interface IPair {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns (address);
-
-}
-
-interface IFactory{
-        function createPair(address tokenA, address tokenB) external returns (address pair);
-        function getPair(address tokenA, address tokenB) external view returns (address pair);
-}
-
-interface IUniswapRouter {
-    function factory() external pure returns (address);
-    function WETH() external pure returns (address);
-    function addLiquidityETH(
-        address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
-    
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external;
-    
-    function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)
-        external
-        payable
-        returns (uint[] memory amounts);
-    
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline) external;
-}
-
 contract DividendPayingToken is ERC20, DividendPayingTokenInterface, Ownable {
 
   using SafeMath for uint256;
@@ -208,4 +163,48 @@ contract DividendPayingToken is ERC20, DividendPayingTokenInterface, Ownable {
       _burn(account, burnAmount);
     }
   }
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+interface IPair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function token0() external view returns (address);
+
+}
+
+interface IFactory{
+        function createPair(address tokenA, address tokenB) external returns (address pair);
+        function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
+
+interface IUniswapRouter {
+    function factory() external pure returns (address);
+    function WETH() external pure returns (address);
+    function addLiquidityETH(
+        address token,
+        uint amountTokenDesired,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline
+    ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
+    
+    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external;
+    
+    function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)
+        external
+        payable
+        returns (uint[] memory amounts);
+    
+    function swapExactTokensForETHSupportingFeeOnTransferTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline) external;
 }
