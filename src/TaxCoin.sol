@@ -5,9 +5,7 @@ pragma solidity ^0.8.15;
 import {DividendPayingToken, ERC20, Ownable} from "./utils/LPDiv.sol";
 import "./utils/IVeloV2.sol";
 
-import "./ITaxCoin.sol";
-
-contract TaxCoin is ERC20, Ownable, ITaxCoin {
+contract TaxCoin is ERC20, Ownable {
     IVeloV2 public router;
     address public pair;
 
@@ -26,8 +24,6 @@ contract TaxCoin is ERC20, Ownable, ITaxCoin {
     uint256 public maxSellAmount;
     uint256 public maxWallet;
 
-    bool isInit;
-
     struct Taxes {
         uint256 liquidity;
         uint256 dev;
@@ -45,18 +41,38 @@ contract TaxCoin is ERC20, Ownable, ITaxCoin {
     mapping(address => bool) public automatedMarketMakerPairs;
     mapping(address => bool) private _isExcludedFromMaxWallet;
 
-    constructor() ERC20("TaxCoin", "TaxCoin") {
+    ///////////////
+    //   Events  //
+    ///////////////
 
-    }
+    event ExcludeFromFees(address indexed account, bool isExcluded);
+    event ExcludeMultipleAccountsFromFees(address[] accounts, bool isExcluded);
+    event SetAutomatedMarketMakerPair(address indexed pair, bool indexed value);
+    event GasForProcessingUpdated(
+        uint256 indexed newValue,
+        uint256 indexed oldValue
+    );
+    event SendDividends(uint256 tokensSwapped, uint256 amount);
+    event ProcessedDividendTracker(
+        uint256 iterations,
+        uint256 claims,
+        uint256 lastProcessedIndex,
+        bool indexed automatic,
+        uint256 gas,
+        address indexed processor
+    );
 
-    function init(address _developerwallet, address _tokenOut, address Vrouter, address VPair) external onlyOwner {
-        if(isInit) revert InitAlreadyDone();
+    constructor(address _developerwallet, address _tokenOut, address Vrouter) ERC20("TAX", "TAX") {
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
         tokenOut = _tokenOut;
 
         IVeloV2 _router = IVeloV2(Vrouter);
-        address _pair = VPair;
+        address _pair = IPoolFactory(_router.defaultFactory()).createPool(
+            address(this),
+            address(_tokenOut),
+            0
+        );
 
         router = _router;
         pair = _pair;
@@ -82,8 +98,6 @@ contract TaxCoin is ERC20, Ownable, ITaxCoin {
         excludeFromFees(address(this), true);
 
         _mint(owner(), 100000000 * (10**18));
-
-        isInit = true;
     }
 
     receive() external payable {}
