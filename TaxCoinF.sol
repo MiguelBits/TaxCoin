@@ -1151,42 +1151,8 @@ interface IPoolFactory {
     function getPool(address tokenA, address tokenB, bool stable) external view returns (address);
 }
 
-contract TaxCoin is ERC20, Ownable {
-    IVeloV2 public router;
-    address public pair;
-
-    bool private swapping;
-    bool public swapEnabled = true;
-    bool public claimEnabled;
-    bool public tradingEnabled;
-
-    TaxCoinDividendTracker public dividendTracker;
-
-    address public devWallet;
-    address public tokenOut;
-
-    uint256 public swapTokensAtAmount;
-    uint256 public maxBuyAmount;
-    uint256 public maxSellAmount;
-    uint256 public maxWallet;
-
-    struct Taxes {
-        uint256 liquidity;
-        uint256 dev;
-    }
-
-    Taxes public buyTaxes = Taxes(3, 3);
-    Taxes public sellTaxes = Taxes(3, 3);
-
-    uint256 public totalBuyTax = 6;
-    uint256 public totalSellTax = 6;
-
-    mapping(address => bool) public _isBot;
-
-    mapping(address => bool) private _isExcludedFromFees;
-    mapping(address => bool) public automatedMarketMakerPairs;
-    mapping(address => bool) private _isExcludedFromMaxWallet;
-
+interface ITaxCoin {
+    error InitAlreadyDone();
     ///////////////
     //   Events  //
     ///////////////
@@ -1207,8 +1173,52 @@ contract TaxCoin is ERC20, Ownable {
         uint256 gas,
         address indexed processor
     );
+}
 
-    constructor(address _developerwallet, address _tokenOut, address Vrouter, address VPair) ERC20("TaxCoin", "TaxCoin") {
+contract TaxCoin is ERC20, Ownable, ITaxCoin {
+    IVeloV2 public router;
+    address public pair;
+
+    bool private swapping;
+    bool public swapEnabled = true;
+    bool public claimEnabled;
+    bool public tradingEnabled;
+
+    TaxCoinDividendTracker public dividendTracker;
+
+    address public devWallet;
+    address public tokenOut;
+
+    uint256 public swapTokensAtAmount;
+    uint256 public maxBuyAmount;
+    uint256 public maxSellAmount;
+    uint256 public maxWallet;
+
+    bool isInit;
+
+    struct Taxes {
+        uint256 liquidity;
+        uint256 dev;
+    }
+
+    Taxes public buyTaxes = Taxes(3, 3);
+    Taxes public sellTaxes = Taxes(3, 3);
+
+    uint256 public totalBuyTax = 6;
+    uint256 public totalSellTax = 6;
+
+    mapping(address => bool) public _isBot;
+
+    mapping(address => bool) private _isExcludedFromFees;
+    mapping(address => bool) public automatedMarketMakerPairs;
+    mapping(address => bool) private _isExcludedFromMaxWallet;
+
+    constructor() ERC20("TaxCoin", "TaxCoin") {
+
+    }
+
+    function init(address _developerwallet, address _tokenOut, address Vrouter, address VPair) external onlyOwner {
+        if(isInit) revert InitAlreadyDone();
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
         tokenOut = _tokenOut;
@@ -1240,6 +1250,8 @@ contract TaxCoin is ERC20, Ownable {
         excludeFromFees(address(this), true);
 
         _mint(owner(), 100000000 * (10**18));
+
+        isInit = true;
     }
 
     receive() external payable {}

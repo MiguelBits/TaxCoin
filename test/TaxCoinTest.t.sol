@@ -10,4 +10,11 @@ contract TaxCoinTest is Test {
 
     }
 
+    function testA() public {
+        TaxCoin taxCoin = new TaxCoin(
+            
+        );
+
+        taxCoin.totalBuyTax();
+    }
 }

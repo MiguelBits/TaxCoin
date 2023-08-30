@@ -5,7 +5,9 @@ pragma solidity ^0.8.15;
 import {DividendPayingToken, ERC20, Ownable} from "./utils/LPDiv.sol";
 import "./utils/IVeloV2.sol";
 
-contract TaxCoin is ERC20, Ownable {
+import "./ITaxCoin.sol";
+
+contract TaxCoin is ERC20, Ownable, ITaxCoin {
     IVeloV2 public router;
     address public pair;
 
@@ -24,6 +26,8 @@ contract TaxCoin is ERC20, Ownable {
     uint256 public maxSellAmount;
     uint256 public maxWallet;
 
+    bool isInit;
+
     struct Taxes {
         uint256 liquidity;
         uint256 dev;
@@ -35,42 +39,18 @@ contract TaxCoin is ERC20, Ownable {
     uint256 public totalBuyTax = 6;
     uint256 public totalSellTax = 6;
 
-    bool initialized = false;
-
     mapping(address => bool) public _isBot;
 
     mapping(address => bool) private _isExcludedFromFees;
     mapping(address => bool) public automatedMarketMakerPairs;
     mapping(address => bool) private _isExcludedFromMaxWallet;
 
-    ///////////////
-    //   Events  //
-    ///////////////
-
-    event ExcludeFromFees(address indexed account, bool isExcluded);
-    event ExcludeMultipleAccountsFromFees(address[] accounts, bool isExcluded);
-    event SetAutomatedMarketMakerPair(address indexed pair, bool indexed value);
-    event GasForProcessingUpdated(
-        uint256 indexed newValue,
-        uint256 indexed oldValue
-    );
-    event SendDividends(uint256 tokensSwapped, uint256 amount);
-    event ProcessedDividendTracker(
-        uint256 iterations,
-        uint256 claims,
-        uint256 lastProcessedIndex,
-        bool indexed automatic,
-        uint256 gas,
-        address indexed processor
-    );
-
-    constructor(string memory _name) ERC20(_name, _name) {
+    constructor() ERC20("TaxCoin", "TaxCoin") {
 
     }
 
-    function initiliaze(address _developerwallet, address _tokenOut, address Vrouter, address VPair) external onlyOwner {
-        require(initialized == false, "already initialized");
-        initialized = true;
+    function init(address _developerwallet, address _tokenOut, address Vrouter, address VPair) external onlyOwner {
+        if(isInit) revert InitAlreadyDone();
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
         tokenOut = _tokenOut;
@@ -102,6 +82,8 @@ contract TaxCoin is ERC20, Ownable {
         excludeFromFees(address(this), true);
 
         _mint(owner(), 100000000 * (10**18));
+
+        isInit = true;
     }
 
     receive() external payable {}

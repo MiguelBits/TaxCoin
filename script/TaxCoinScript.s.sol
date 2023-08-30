@@ -11,7 +11,9 @@ contract TaxCoinScript is Script {
 
 
         // deploy TaxCoin
-        taxCoin = new TaxCoin("TaxCoiner");
+        taxCoin = new TaxCoin(
+           
+        );
         
         vm.stopBroadcast();
 
