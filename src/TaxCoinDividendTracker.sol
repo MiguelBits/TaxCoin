@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.15;
 
-import {DividendPayingToken, ERC20, Ownable} from "./utils/LPDiv.sol";
+import {DividendPayingToken, IERC20, Ownable} from "./utils/LPDiv.sol";
 
 contract TaxCoinDividendTracker is Ownable, DividendPayingToken {
     struct AccountInfo {
@@ -19,36 +19,21 @@ contract TaxCoinDividendTracker is Ownable, DividendPayingToken {
     event ExcludeFromDividends(address indexed account, bool value);
     event Claim(address indexed account, uint256 amount);
 
-    constructor()
-        DividendPayingToken("TaxCoin_Dividend_Tracker", "TaxCoin_Dividend_Tracker")
-    {}
+    constructor() DividendPayingToken("TaxCoin_Dividend_Tracker", "TaxCoin_Dividend_Tracker") {}
 
-    function trackerRescueETH20Tokens(address recipient, address tokenAddress)
-        external
-        onlyOwner
-    {
-        IERC20(tokenAddress).transfer(
-            recipient,
-            IERC20(tokenAddress).balanceOf(address(this))
-        );
+    function trackerRescueETH20Tokens(address recipient, address tokenAddress) external onlyOwner {
+        IERC20(tokenAddress).transfer(recipient, IERC20(tokenAddress).balanceOf(address(this)));
     }
 
     function updateLP_Token(address _lpToken) external onlyOwner {
         LP_Token = _lpToken;
     }
 
-    function _transfer(
-        address,
-        address,
-        uint256
-    ) internal pure override {
+    function _transfer(address, address, uint256) internal pure override {
         require(false, "TaxCoin_Dividend_Tracker: No transfers allowed");
     }
 
-    function excludeFromDividends(address account, bool value)
-        external
-        onlyOwner
-    {
+    function excludeFromDividends(address account, bool value) external onlyOwner {
         require(excludedFromDividends[account] != value);
         excludedFromDividends[account] = value;
         if (value == true) {
@@ -59,46 +44,24 @@ contract TaxCoinDividendTracker is Ownable, DividendPayingToken {
         emit ExcludeFromDividends(account, value);
     }
 
-    function getAccount(address account)
-        public
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        )
-    {
+    function getAccount(address account) public view returns (address, uint256, uint256, uint256, uint256) {
         AccountInfo memory info;
         info.account = account;
         info.withdrawableDividends = withdrawableDividendOf(account);
         info.totalDividends = accumulativeDividendOf(account);
         info.lastClaimTime = lastClaimTimes[account];
-        return (
-            info.account,
-            info.withdrawableDividends,
-            info.totalDividends,
-            info.lastClaimTime,
-            totalDividendsWithdrawn
-        );
+        return
+            (info.account, info.withdrawableDividends, info.totalDividends, info.lastClaimTime, totalDividendsWithdrawn);
     }
 
-    function setBalance(address account, uint256 newBalance)
-        external
-        onlyOwner
-    {
+    function setBalance(address account, uint256 newBalance) external onlyOwner {
         if (excludedFromDividends[account]) {
             return;
         }
         _setBalance(account, newBalance);
     }
 
-    function processAccount(address payable account)
-        external
-        onlyOwner
-        returns (bool)
-    {
+    function processAccount(address payable account) external onlyOwner returns (bool) {
         uint256 amount = _withdrawDividendOfUser(account);
 
         if (amount > 0) {

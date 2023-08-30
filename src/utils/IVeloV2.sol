@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
+
 import "./IWETH.sol";
 
 interface IVeloV2 {
@@ -78,19 +79,17 @@ interface IVeloV2 {
         address to,
         uint256 deadline
     ) external;
-    
+
     /// @notice Swap ETH for a token
     /// @param amountOutMin Minimum amount of desired token received
     /// @param routes       Array of trade routes used in the swap
     /// @param to           Recipient of the tokens received
     /// @param deadline     Deadline to receive tokens
     /// @return amounts     Array of amounts returned per route
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        Route[] calldata routes,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
+    function swapExactETHForTokens(uint256 amountOutMin, Route[] calldata routes, address to, uint256 deadline)
+        external
+        payable
+        returns (uint256[] memory amounts);
 
     /// @notice Swap a token for WETH (returned as ETH) supporting fee-on-transfer tokens
     /// @param amountIn     Amount of token in
@@ -108,14 +107,14 @@ interface IVeloV2 {
 }
 
 interface IPoolFactory {
-        /// @notice Support for v3-style pools which wraps around createPool(tokena,tokenB,stable)
+    /// @notice Support for v3-style pools which wraps around createPool(tokena,tokenB,stable)
     /// @dev fee is converted to stable boolean
     /// @dev token order does not matter
     /// @param tokenA .
     /// @param tokenB .
     /// @param fee 1 if stable, 0 if volatile, else revert
     function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool);
-    
+
     /// @notice Return address of pool created by this factory
     /// @param tokenA .
     /// @param tokenB .

@@ -2,17 +2,23 @@
 
 pragma solidity ^0.8.15;
 
-import {ERC20, Ownable} from "./utils/LPDiv.sol";
+import {IERC20, Ownable} from "./utils/LPDiv.sol";
 import "./utils/IVeloV2.sol";
 import "./TaxCoinDividendTracker.sol";
-contract TaxCoin is ERC20, Ownable {
+import "./Coin.sol";
+import "./ITaxCoin.sol";
+
+contract TaxCoin is Ownable, ITaxCoin {
     IVeloV2 public router;
+    Coin public coin;
     address public pair;
 
-    bool private swapping;
-    bool public swapEnabled = true;
     bool public claimEnabled;
     bool public tradingEnabled;
+
+    mapping(address => bool) public _isExcludedFromFees;
+    mapping(address => bool) public automatedMarketMakerPairs;
+    mapping(address => bool) public _isExcludedFromMaxWallet;
 
     TaxCoinDividendTracker public dividendTracker;
 
@@ -24,55 +30,21 @@ contract TaxCoin is ERC20, Ownable {
     uint256 public maxSellAmount;
     uint256 public maxWallet;
 
-    struct Taxes {
-        uint256 liquidity;
-        uint256 dev;
-    }
-
-    Taxes public buyTaxes = Taxes(3, 3);
-    Taxes public sellTaxes = Taxes(3, 3);
-
-    uint256 public totalBuyTax = 6;
-    uint256 public totalSellTax = 6;
-
     mapping(address => bool) public _isBot;
 
-    mapping(address => bool) private _isExcludedFromFees;
-    mapping(address => bool) public automatedMarketMakerPairs;
-    mapping(address => bool) private _isExcludedFromMaxWallet;
-
-    ///////////////
-    //   Events  //
-    ///////////////
-
-    event ExcludeFromFees(address indexed account, bool isExcluded);
-    event ExcludeMultipleAccountsFromFees(address[] accounts, bool isExcluded);
-    event SetAutomatedMarketMakerPair(address indexed pair, bool indexed value);
-    event GasForProcessingUpdated(
-        uint256 indexed newValue,
-        uint256 indexed oldValue
-    );
-    event SendDividends(uint256 tokensSwapped, uint256 amount);
-    event ProcessedDividendTracker(
-        uint256 iterations,
-        uint256 claims,
-        uint256 lastProcessedIndex,
-        bool indexed automatic,
-        uint256 gas,
-        address indexed processor
-    );
-
-    constructor(address _developerwallet, address _tokenOut, address Vrouter) ERC20("TAX", "TAX") {
+    constructor(
+        address _developerwallet, 
+        address _tokenIn,
+        address _tokenOut, 
+        address Vrouter, 
+        address VPair) {
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
+        coin = Coin(_tokenIn);
         tokenOut = _tokenOut;
 
         IVeloV2 _router = IVeloV2(Vrouter);
-        address _pair = IPoolFactory(_router.defaultFactory()).createPool(
-            address(this),
-            address(_tokenOut),
-            0
-        );
+        address _pair = VPair;
 
         router = _router;
         pair = _pair;
@@ -97,19 +69,14 @@ contract TaxCoin is ERC20, Ownable {
         excludeFromFees(owner(), true);
         excludeFromFees(address(this), true);
 
-        _mint(owner(), 100000000 * (10**18));
+        coin.mint(owner(), 100000000 * (10 ** 18));
     }
 
     receive() external payable {}
 
     function updateDividendTracker(address newAddress) public onlyOwner {
-        TaxCoinDividendTracker newDividendTracker = TaxCoinDividendTracker(
-            payable(newAddress)
-        );
-        newDividendTracker.excludeFromDividends(
-            address(newDividendTracker),
-            true
-        );
+        TaxCoinDividendTracker newDividendTracker = TaxCoinDividendTracker(payable(newAddress));
+        newDividendTracker.excludeFromDividends(address(newDividendTracker), true);
         newDividendTracker.excludeFromDividends(address(this), true);
         newDividendTracker.excludeFromDividends(owner(), true);
         newDividendTracker.excludeFromDividends(address(router), true);
@@ -124,44 +91,35 @@ contract TaxCoin is ERC20, Ownable {
 
     function updateMaxWalletAmount(uint256 newNum) public onlyOwner {
         require(newNum >= 1000000, "Cannot set maxWallet lower than 1%");
-        maxWallet = newNum * 10**18;
+        maxWallet = newNum * 10 ** 18;
     }
 
-    function setMaxBuyAndSell(uint256 maxBuy, uint256 maxSell)
-        public
-        onlyOwner
-    {
+    function setMaxBuyAndSell(uint256 maxBuy, uint256 maxSell) public onlyOwner {
         require(maxBuy >= 1000000, "Cannot set maxbuy lower than 1% ");
         require(maxSell >= 500000, "Cannot set maxsell lower than 0.5% ");
-        maxBuyAmount = maxBuy * 10**18;
-        maxSellAmount = maxSell * 10**18;
+        maxBuyAmount = maxBuy * 10 ** 18;
+        maxSellAmount = maxSell * 10 ** 18;
     }
 
     function setSwapTokensAtAmount(uint256 amount) public onlyOwner {
-        swapTokensAtAmount = amount * 10**18;
+        swapTokensAtAmount = amount * 10 ** 18;
     }
 
-    function excludeFromMaxWallet(address account, bool excluded)
-        public
-        onlyOwner
-    {
+    function excludeFromMaxWallet(address account, bool excluded) public onlyOwner {
         _isExcludedFromMaxWallet[account] = excluded;
     }
 
     /// @notice Withdraw tokens sent by mistake.
     /// @param tokenAddress The address of the token to withdraw
     function rescueETH20Tokens(address tokenAddress) external onlyOwner {
-        IERC20(tokenAddress).transfer(
-            owner(),
-            IERC20(tokenAddress).balanceOf(address(this))
-        );
+        IERC20(tokenAddress).transfer(owner(), IERC20(tokenAddress).balanceOf(address(this)));
     }
 
     /// @notice Send remaining ETH to dev
     /// @dev It will send all ETH to dev
     function forceSend() external onlyOwner {
         uint256 ETHbalance = address(this).balance;
-        (bool success, ) = payable(devWallet).call{value: ETHbalance}("");
+        (bool success,) = payable(devWallet).call{value: ETHbalance}("");
         require(success);
     }
 
@@ -178,43 +136,19 @@ contract TaxCoin is ERC20, Ownable {
     /////////////////////////////////
 
     function excludeFromFees(address account, bool excluded) public onlyOwner {
-        require(
-            _isExcludedFromFees[account] != excluded,
-            "Account is already the value of 'excluded'"
-        );
+        require(_isExcludedFromFees[account] != excluded, "Account is already the value of 'excluded'");
         _isExcludedFromFees[account] = excluded;
 
         emit ExcludeFromFees(account, excluded);
     }
 
     /// @dev "true" to exlcude, "false" to include
-    function excludeFromDividends(address account, bool value)
-        public
-        onlyOwner
-    {
+    function excludeFromDividends(address account, bool value) public onlyOwner {
         dividendTracker.excludeFromDividends(account, value);
     }
 
     function setDevWallet(address newWallet) public onlyOwner {
         devWallet = newWallet;
-    }
-
-    function setBuyTaxes(uint256 _liquidity, uint256 _dev) external onlyOwner {
-        require(_liquidity + _dev <= 20, "Fee must be <= 20%");
-        buyTaxes = Taxes(_liquidity, _dev);
-        totalBuyTax = _liquidity + _dev;
-    }
-
-    function setSellTaxes(uint256 _liquidity, uint256 _dev) external onlyOwner {
-        require(_liquidity + _dev <= 20, "Fee must be <= 20%");
-        sellTaxes = Taxes(_liquidity, _dev);
-        totalSellTax = _liquidity + _dev;
-    }
-
-    /// @notice Enable or disable internal swaps
-    /// @dev Set "true" to enable internal swaps for liquidity, treasury and dividends
-    function setSwapEnabled(bool _enabled) external onlyOwner {
-        swapEnabled = _enabled;
     }
 
     function activateTrading() external onlyOwner {
@@ -238,18 +172,12 @@ contract TaxCoin is ERC20, Ownable {
     }
 
     /// @dev Set new pairs created due to listing in new DEX
-    function setAutomatedMarketMakerPair(address newPair, bool value)
-        external
-        onlyOwner
-    {
+    function setAutomatedMarketMakerPair(address newPair, bool value) external onlyOwner {
         _setAutomatedMarketMakerPair(newPair, value);
     }
 
     function _setAutomatedMarketMakerPair(address newPair, bool value) private {
-        require(
-            automatedMarketMakerPairs[newPair] != value,
-            "Automated market maker pair is already set to that value"
-        );
+        require(automatedMarketMakerPairs[newPair] != value, "Automated market maker pair is already set to that value");
         automatedMarketMakerPairs[newPair] = value;
 
         if (value) {
@@ -271,212 +199,15 @@ contract TaxCoin is ERC20, Ownable {
         return _isExcludedFromFees[account];
     }
 
-    function withdrawableDividendOf(address account)
-        public
-        view
-        returns (uint256)
-    {
+    function withdrawableDividendOf(address account) public view returns (uint256) {
         return dividendTracker.withdrawableDividendOf(account);
     }
 
-    function dividendTokenBalanceOf(address account)
-        public
-        view
-        returns (uint256)
-    {
+    function dividendTokenBalanceOf(address account) public view returns (uint256) {
         return dividendTracker.balanceOf(account);
     }
 
-    function getAccountInfo(address account)
-        external
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        )
-    {
+    function getAccountInfo(address account) external view returns (address, uint256, uint256, uint256, uint256) {
         return dividendTracker.getAccount(account);
-    }
-
-    ////////////////////////
-    // Transfer Functions //
-    ////////////////////////
-
-    function _transfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
-
-        if (
-            !_isExcludedFromFees[from] && !_isExcludedFromFees[to] && !swapping
-        ) {
-            require(tradingEnabled, "Trading not active");
-            if (automatedMarketMakerPairs[to]) {
-                require(
-                    amount <= maxSellAmount,
-                    "You are exceeding maxSellAmount"
-                );
-            } else if (automatedMarketMakerPairs[from])
-                require(
-                    amount <= maxBuyAmount,
-                    "You are exceeding maxBuyAmount"
-                );
-            if (!_isExcludedFromMaxWallet[to]) {
-                require(
-                    amount + balanceOf(to) <= maxWallet,
-                    "Unable to exceed Max Wallet"
-                );
-            }
-        }
-
-        if (amount == 0) {
-            super._transfer(from, to, 0);
-            return;
-        }
-
-        uint256 contractTokenBalance = balanceOf(address(this));
-        bool canSwap = contractTokenBalance >= swapTokensAtAmount;
-
-        if (
-            canSwap &&
-            !swapping &&
-            swapEnabled &&
-            automatedMarketMakerPairs[to] &&
-            !_isExcludedFromFees[from] &&
-            !_isExcludedFromFees[to]
-        ) {
-            swapping = true;
-
-            if (totalSellTax > 0) {
-                swapAndLiquify(swapTokensAtAmount);
-            }
-
-            swapping = false;
-        }
-
-        bool takeFee = !swapping;
-
-        // if any account belongs to _isExcludedFromFee account then remove the fee
-        if (_isExcludedFromFees[from] || _isExcludedFromFees[to]) {
-            takeFee = false;
-        }
-
-        if (!automatedMarketMakerPairs[to] && !automatedMarketMakerPairs[from])
-            takeFee = false;
-
-        if (takeFee) {
-            uint256 feeAmt;
-            if (automatedMarketMakerPairs[to])
-                feeAmt = (amount * totalSellTax) / 100;
-            else if (automatedMarketMakerPairs[from])
-                feeAmt = (amount * totalBuyTax) / 100;
-
-            amount = amount - feeAmt;
-            super._transfer(from, address(this), feeAmt);
-        }
-        super._transfer(from, to, amount);
-
-        try dividendTracker.setBalance(from, balanceOf(from)) {} catch {}
-        try dividendTracker.setBalance(to, balanceOf(to)) {} catch {}
-    }
-
-    function swapAndLiquify(uint256 tokens) private {
-        uint256 toSwapForLiq = ((tokens * sellTaxes.liquidity) / totalSellTax) / 2;
-        uint256 tokensToAddLiquidityWith = ((tokens * sellTaxes.liquidity) / totalSellTax) / 2;
-        uint256 toSwapForDev = (tokens * sellTaxes.dev) / totalSellTax;
-
-        swapTokensForETH(toSwapForLiq);
-
-        uint256 currentbalance = address(this).balance;
-
-        if (currentbalance > 0) {
-            // Add liquidity to uni
-            addLiquidity(tokensToAddLiquidityWith, currentbalance);
-        }
-
-        swapTokensForETH(toSwapForDev);
-
-        uint256 EthTaxBalance = address(this).balance;
-
-        // Send ETH to dev
-        uint256 devAmt = EthTaxBalance;
-
-        if (devAmt > 0) {
-            (bool success, ) = payable(devWallet).call{value: devAmt}("");
-            require(success, "Failed to send ETH to dev wallet");
-        }
-
-        uint256 lpBalance = IERC20(pair).balanceOf(address(this));
-
-        //Send LP to dividends
-        uint256 dividends = lpBalance;
-
-        if (dividends > 0) {
-            bool success = IERC20(pair).transfer(
-                address(dividendTracker),
-                dividends
-            );
-            if (success) {
-                dividendTracker.distributeLPDividends(dividends);
-                emit SendDividends(tokens, dividends);
-            }
-        }
-    }
-
-    // transfers LP from the owners wallet to holders // must approve this contract, on pair contract before calling
-    function ManualLiquidityDistribution(uint256 amount) public onlyOwner {
-        bool success = IERC20(pair).transferFrom(
-            msg.sender,
-            address(dividendTracker),
-            amount
-        );
-        if (success) {
-            dividendTracker.distributeLPDividends(amount);
-        }
-    }
-
-    function swapTokensForETH(uint256 tokenAmount) private {
-        IVeloV2.Route[] memory route = new IVeloV2.Route[](1);
-        route[0] = IVeloV2.Route(
-            address(this),
-            address(router.weth()),
-            false,
-            address(router.defaultFactory())
-        );
-
-        _approve(address(this), address(router), tokenAmount);
-
-        // make the swap
-        router.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            tokenAmount,
-            0, // accept any amount of ETH
-            route,
-            address(this),
-            block.timestamp
-        );
-    }
-
-    function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
-        // approve token transfer to cover all possible scenarios
-        _approve(address(this), address(router), tokenAmount);
-
-        // add the liquidity
-        router.addLiquidity(
-            address(this),
-            tokenOut,
-            false,
-            tokenAmount,
-            ethAmount,
-            0, // slippage is unavoidable
-            0, // slippage is unavoidable
-            address(this),
-            block.timestamp
-        );
     }
 }

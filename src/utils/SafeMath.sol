@@ -202,7 +202,6 @@ library SafeMathInt {
         return a < 0 ? -a : a;
     }
 
-
     function toUint256Safe(int256 a) internal pure returns (uint256) {
         require(a >= 0);
         return uint256(a);
@@ -214,9 +213,9 @@ library SafeMathInt {
  * @dev Math operations with safety checks that revert on error
  */
 library SafeMathUint {
-  function toInt256Safe(uint256 a) internal pure returns (int256) {
-    int256 b = int256(a);
-    require(b >= 0);
-    return b;
-  }
+    function toInt256Safe(uint256 a) internal pure returns (int256) {
+        int256 b = int256(a);
+        require(b >= 0);
+        return b;
+    }
 }

@@ -5,14 +5,11 @@ import "forge-std/Test.sol";
 import {TaxCoin} from "../src/TaxCoin.sol";
 
 contract TaxCoinTest is Test {
-
-    function setUp() public {
-
-    }
+    function setUp() public {}
 
     function testA() public {
         // TaxCoin taxCoin = new TaxCoin(
-            
+
         // );
 
         // taxCoin.totalBuyTax();
