@@ -9,7 +9,6 @@ contract TaxCoinScript is Script {
     function run() public returns(TaxCoin taxCoin){
         vm.startBroadcast();
 
-
         // deploy TaxCoin
         taxCoin = new TaxCoin(
             0xdC887AE5c6052baDC5D17a4eB2350b309cb2025f, //dev wallet
