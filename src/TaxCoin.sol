@@ -35,6 +35,8 @@ contract TaxCoin is ERC20, Ownable {
     uint256 public totalBuyTax = 6;
     uint256 public totalSellTax = 6;
 
+    bool initialized = false;
+
     mapping(address => bool) public _isBot;
 
     mapping(address => bool) private _isExcludedFromFees;
@@ -62,7 +64,13 @@ contract TaxCoin is ERC20, Ownable {
         address indexed processor
     );
 
-    constructor(address _developerwallet, address _tokenOut, address Vrouter, address VPair) ERC20("TaxCoin", "TaxCoin") {
+    constructor(string memory _name) ERC20(_name, _name) {
+
+    }
+
+    function initiliaze(address _developerwallet, address _tokenOut, address Vrouter, address VPair) external onlyOwner {
+        require(initialized == false, "already initialized");
+        initialized = true;
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
         tokenOut = _tokenOut;
