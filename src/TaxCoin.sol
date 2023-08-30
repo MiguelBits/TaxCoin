@@ -62,17 +62,13 @@ contract TaxCoin is ERC20, Ownable {
         address indexed processor
     );
 
-    constructor(address _developerwallet, address _tokenOut) ERC20("TaxCoin", "TaxCoin") {
+    constructor(address _developerwallet, address _tokenOut, address Vrouter, address VPair) ERC20("TaxCoin", "TaxCoin") {
         dividendTracker = new TaxCoinDividendTracker();
         setDevWallet(_developerwallet);
         tokenOut = _tokenOut;
 
-        IVeloV2 _router = IVeloV2(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        address _pair = IPoolFactory(_router.defaultFactory()).createPool(
-            address(this),
-            address(_tokenOut),
-            false
-        );
+        IVeloV2 _router = IVeloV2(Vrouter);
+        address _pair = VPair;
 
         router = _router;
         pair = _pair;

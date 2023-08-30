@@ -108,13 +108,14 @@ interface IVeloV2 {
 }
 
 interface IPoolFactory {
-    /// @notice Create a pool given two tokens and if they're stable/volatile
+        /// @notice Support for v3-style pools which wraps around createPool(tokena,tokenB,stable)
+    /// @dev fee is converted to stable boolean
     /// @dev token order does not matter
     /// @param tokenA .
     /// @param tokenB .
-    /// @param stable .
-    function createPool(address tokenA, address tokenB, bool stable) external returns (address pool);
-
+    /// @param fee 1 if stable, 0 if volatile, else revert
+    function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool);
+    
     /// @notice Return address of pool created by this factory
     /// @param tokenA .
     /// @param tokenB .
